@@ -1,0 +1,313 @@
+<!doctype html>
+<html lang="pl">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Grafik Prosty</title>
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <div class="app-shell">
+      <aside class="sidebar">
+        <div class="brand">
+          <div class="brand-mark">G</div>
+          <div>
+            <strong>Grafik Prosty</strong>
+            <span id="roleLabel">Tryb managera</span>
+          </div>
+        </div>
+
+        <nav class="nav" aria-label="Główna nawigacja">
+          <button class="nav-item active" data-view="entry" data-roles="input,manager">
+            <span class="icon">+</span>
+            Wpisy godzin
+          </button>
+          <button class="nav-item" data-view="dashboard" data-roles="boss,manager,input">
+            <span class="icon">#</span>
+            Dashboard
+          </button>
+          <button class="nav-item" data-view="rates" data-roles="manager">
+            <span class="icon">$</span>
+            Stawki
+          </button>
+          <button class="nav-item" data-view="analysis" data-roles="manager,boss">
+            <span class="icon">%</span>
+            Analiza
+          </button>
+          <button class="nav-item" data-view="sharing" data-roles="manager">
+            <span class="icon">@</span>
+            Linki
+          </button>
+          <button class="nav-item" data-view="settings" data-roles="manager">
+            <span class="icon">*</span>
+            Ustawienia
+          </button>
+        </nav>
+
+        <div class="sidebar-card">
+          <span>Okres rozliczenia</span>
+          <input id="periodMonth" type="month" />
+        </div>
+      </aside>
+
+      <main class="content">
+        <header class="topbar">
+          <div>
+            <p class="eyebrow">Planowanie i rozliczanie pracy</p>
+            <h1 id="viewTitle">Wpisy godzin</h1>
+          </div>
+          <div class="topbar-actions">
+            <button id="syncBtn" class="ghost-button">Synchronizuj</button>
+            <button id="exportCsvBtn" class="ghost-button">CSV</button>
+            <button id="exportJsonBtn" class="ghost-button">Eksport</button>
+            <label class="ghost-button file-button">
+              Import
+              <input id="importJsonInput" type="file" accept="application/json" />
+            </label>
+          </div>
+        </header>
+
+        <section id="entry" class="view active">
+          <div class="split-layout">
+            <form id="shiftForm" class="panel form-panel">
+              <div class="panel-header">
+                <div>
+                  <p class="eyebrow">Moduł dla osoby wpisującej godziny</p>
+                  <h2>Dodaj zmianę</h2>
+                </div>
+              </div>
+
+              <label>
+                Pracownik
+                <select id="shiftEmployee" required></select>
+              </label>
+
+              <div class="form-grid">
+                <label>
+                  Data
+                  <input id="shiftDate" type="date" required />
+                </label>
+                <label>
+                  Typ
+                  <select id="shiftType">
+                    <option value="regular">Praca</option>
+                    <option value="holiday">Urlop</option>
+                    <option value="sick">Chorobowe</option>
+                    <option value="training">Szkolenie</option>
+                  </select>
+                </label>
+                <label>
+                  Start
+                  <input id="shiftStart" type="time" value="08:00" required />
+                </label>
+                <label>
+                  Koniec
+                  <input id="shiftEnd" type="time" value="16:00" required />
+                </label>
+                <label>
+                  Przerwa min.
+                  <input id="shiftBreak" type="number" min="0" step="5" value="0" />
+                </label>
+                <label>
+                  Mnożnik
+                  <select id="shiftMultiplier">
+                    <option value="1">1.0x</option>
+                    <option value="1.25">1.25x</option>
+                    <option value="1.5">1.5x</option>
+                    <option value="2">2.0x</option>
+                  </select>
+                </label>
+              </div>
+
+              <label>
+                Notatka
+                <textarea id="shiftNote" rows="3" placeholder="np. zastępstwo, praca w nocy, uwagi do grafiku"></textarea>
+              </label>
+
+              <button class="primary-button" type="submit">Zapisz zmianę</button>
+            </form>
+
+            <div class="panel">
+              <div class="panel-header">
+                <div>
+                  <p class="eyebrow">Ostatnie wpisy</p>
+                  <h2>Zmiany w wybranym miesiącu</h2>
+                </div>
+              </div>
+              <div id="shiftList" class="shift-list"></div>
+            </div>
+          </div>
+        </section>
+
+        <section id="dashboard" class="view">
+          <div class="metric-grid">
+            <article class="metric">
+              <span>Łącznie godzin</span>
+              <strong id="totalHours">0</strong>
+            </article>
+            <article class="metric">
+              <span>Aktywni pracownicy</span>
+              <strong id="activeEmployees">0</strong>
+            </article>
+            <article class="metric manager-only">
+              <span>Koszt wynagrodzeń</span>
+              <strong id="totalPayroll">0 zł</strong>
+            </article>
+            <article class="metric">
+              <span>Średnio na osobę</span>
+              <strong id="avgHours">0</strong>
+            </article>
+          </div>
+
+          <div class="panel">
+            <div class="panel-header">
+              <div>
+                <p class="eyebrow">Podsumowanie dla szefa</p>
+                <h2>Godziny według pracownika</h2>
+              </div>
+              <input id="dashboardSearch" type="search" placeholder="Szukaj pracownika" />
+            </div>
+            <div class="table-wrap">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Pracownik</th>
+                    <th>Stanowisko</th>
+                    <th>Godziny</th>
+                    <th>Dni</th>
+                    <th class="manager-only">Stawka</th>
+                    <th class="manager-only">Koszt</th>
+                  </tr>
+                </thead>
+                <tbody id="summaryTable"></tbody>
+              </table>
+            </div>
+          </div>
+        </section>
+
+        <section id="rates" class="view">
+          <div class="split-layout">
+            <form id="employeeForm" class="panel form-panel">
+              <div class="panel-header">
+                <div>
+                  <p class="eyebrow">Panel managera</p>
+                  <h2>Pracownicy i stawki</h2>
+                </div>
+              </div>
+              <input id="employeeId" type="hidden" />
+              <label>
+                Imię i nazwisko
+                <input id="employeeName" type="text" required placeholder="np. Anna Kowalska" />
+              </label>
+              <label>
+                Stanowisko / dział
+                <input id="employeePosition" type="text" placeholder="np. produkcja, biuro, magazyn" />
+              </label>
+              <div class="form-grid">
+                <label>
+                  Stawka godzinowa
+                  <input id="employeeRate" type="number" min="0" step="0.01" value="0" />
+                </label>
+                <label>
+                  Norma miesięczna
+                  <input id="employeeNorm" type="number" min="0" step="0.5" value="168" />
+                </label>
+              </div>
+              <button class="primary-button" type="submit">Zapisz pracownika</button>
+              <button id="resetEmployeeForm" class="ghost-button" type="button">Wyczyść formularz</button>
+            </form>
+
+            <div class="panel">
+              <div class="panel-header">
+                <div>
+                  <p class="eyebrow">Lista</p>
+                  <h2>Pracownicy</h2>
+                </div>
+              </div>
+              <div id="employeeList" class="employee-list"></div>
+            </div>
+          </div>
+        </section>
+
+        <section id="analysis" class="view">
+          <div class="panel">
+            <div class="panel-header">
+              <div>
+                <p class="eyebrow">Elastyczna analiza</p>
+                <h2>Porównanie godzin i norm</h2>
+              </div>
+              <select id="analysisSort">
+                <option value="hoursDesc">Najwięcej godzin</option>
+                <option value="costDesc" class="manager-only-option">Największy koszt</option>
+                <option value="overtimeDesc">Najwięcej nadgodzin</option>
+                <option value="nameAsc">Alfabetycznie</option>
+              </select>
+            </div>
+            <div id="analysisList" class="analysis-list"></div>
+          </div>
+        </section>
+
+        <section id="sharing" class="view">
+          <div class="panel">
+            <div class="panel-header">
+              <div>
+                <p class="eyebrow">Udostępnianie</p>
+                <h2>Linki do ról</h2>
+              </div>
+            </div>
+            <div class="link-grid">
+              <div>
+                <span>Osoba wpisująca godziny</span>
+                <code id="inputLink"></code>
+                <button class="ghost-button copy-link" data-link="inputLink">Kopiuj</button>
+              </div>
+              <div>
+                <span>Szef - dashboard bez stawek</span>
+                <code id="bossLink"></code>
+                <button class="ghost-button copy-link" data-link="bossLink">Kopiuj</button>
+              </div>
+              <div>
+                <span>Manager - pełny dostęp</span>
+                <code id="managerLink"></code>
+                <button class="ghost-button copy-link" data-link="managerLink">Kopiuj</button>
+              </div>
+            </div>
+            <p class="note">
+              Ta aplikacja działa bez własnego serwera. Do wspólnych danych użyj Google Sheets i wklej link API w zakładce
+              Ustawienia.
+            </p>
+          </div>
+        </section>
+
+        <section id="settings" class="view">
+          <div class="panel">
+            <div class="panel-header">
+              <div>
+                <p class="eyebrow">Google Sheets</p>
+                <h2>Synchronizacja danych</h2>
+              </div>
+            </div>
+            <form id="settingsForm" class="settings-form">
+              <label>
+                Link API z Google Apps Script
+                <input id="apiUrl" type="url" placeholder="https://script.google.com/macros/s/.../exec" />
+              </label>
+              <div class="settings-actions">
+                <button class="primary-button" type="submit">Zapisz ustawienia</button>
+                <button id="loadRemoteBtn" class="ghost-button" type="button">Pobierz z arkusza</button>
+                <button id="saveRemoteBtn" class="ghost-button" type="button">Wyślij do arkusza</button>
+              </div>
+            </form>
+            <p class="note">
+              Jeśli pole jest puste, dane zapisują się tylko w tej przeglądarce. Po wklejeniu linku API przycisk
+              Synchronizuj będzie pobierał i zapisywał dane w Google Sheets.
+            </p>
+          </div>
+        </section>
+      </main>
+    </div>
+
+    <div id="toast" class="toast" role="status" aria-live="polite"></div>
+    <script src="app.js"></script>
+  </body>
+</html>
