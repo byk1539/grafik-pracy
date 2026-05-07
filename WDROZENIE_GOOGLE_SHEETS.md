@@ -61,9 +61,9 @@ Link dla osoby wpisujacej godziny:
 
 `index.html?role=input`
 
-Link dla szefa:
+Link dla wlasciciela:
 
-`index.html?role=boss`
+`index.html?role=owner`
 
 Link dla Ciebie:
 

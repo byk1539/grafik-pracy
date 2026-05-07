@@ -226,7 +226,7 @@ textarea {
 }
 
 .metric-grid {
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
   margin-bottom: 18px;
 }
 
@@ -287,7 +287,8 @@ textarea {
 
 .shift-list,
 .employee-list,
-.analysis-list {
+.analysis-list,
+.daily-summary {
   display: grid;
   gap: 10px;
 }
@@ -320,6 +321,23 @@ textarea {
   border-radius: 8px;
   background: #ffffff;
   font-weight: 800;
+}
+
+.detail-table {
+  margin-top: 8px;
+  border-top: 1px solid var(--line);
+  padding-top: 8px;
+}
+
+.report-panel {
+  margin-top: 18px;
+}
+
+.report-controls {
+  display: grid;
+  grid-template-columns: minmax(180px, 220px) minmax(180px, 220px) max-content;
+  gap: 12px;
+  align-items: end;
 }
 
 .danger {
@@ -438,9 +456,6 @@ code {
     position: static;
   }
 
-  .metric-grid {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
 }
 
 @media (max-width: 620px) {
@@ -458,7 +473,8 @@ code {
 
   .form-grid,
   .metric-grid,
-  .settings-actions {
+  .settings-actions,
+  .report-controls {
     grid-template-columns: 1fr;
   }
 

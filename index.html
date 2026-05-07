@@ -22,7 +22,7 @@
             <span class="icon">+</span>
             Wpisy godzin
           </button>
-          <button class="nav-item" data-view="dashboard" data-roles="boss,manager,input">
+          <button class="nav-item" data-view="dashboard" data-roles="owner,manager,input">
             <span class="icon">#</span>
             Dashboard
           </button>
@@ -30,7 +30,7 @@
             <span class="icon">$</span>
             Stawki
           </button>
-          <button class="nav-item" data-view="analysis" data-roles="manager,boss">
+          <button class="nav-item" data-view="analysis" data-roles="manager,owner">
             <span class="icon">%</span>
             Analiza
           </button>
@@ -88,34 +88,12 @@
                   <input id="shiftDate" type="date" required />
                 </label>
                 <label>
-                  Typ
-                  <select id="shiftType">
-                    <option value="regular">Praca</option>
-                    <option value="holiday">Urlop</option>
-                    <option value="sick">Chorobowe</option>
-                    <option value="training">Szkolenie</option>
-                  </select>
-                </label>
-                <label>
                   Start
                   <input id="shiftStart" type="time" value="08:00" required />
                 </label>
                 <label>
                   Koniec
                   <input id="shiftEnd" type="time" value="16:00" required />
-                </label>
-                <label>
-                  Przerwa min.
-                  <input id="shiftBreak" type="number" min="0" step="5" value="0" />
-                </label>
-                <label>
-                  Mnożnik
-                  <select id="shiftMultiplier">
-                    <option value="1">1.0x</option>
-                    <option value="1.25">1.25x</option>
-                    <option value="1.5">1.5x</option>
-                    <option value="2">2.0x</option>
-                  </select>
                 </label>
               </div>
 
@@ -149,7 +127,7 @@
               <span>Aktywni pracownicy</span>
               <strong id="activeEmployees">0</strong>
             </article>
-            <article class="metric manager-only">
+            <article class="metric finance-visible">
               <span>Koszt wynagrodzeń</span>
               <strong id="totalPayroll">0 zł</strong>
             </article>
@@ -157,30 +135,44 @@
               <span>Średnio na osobę</span>
               <strong id="avgHours">0</strong>
             </article>
+            <article class="metric finance-visible">
+              <span>Najdroższy dzień</span>
+              <strong id="peakDayCost">0 zł</strong>
+            </article>
           </div>
 
           <div class="panel">
             <div class="panel-header">
               <div>
                 <p class="eyebrow">Podsumowanie dla szefa</p>
-                <h2>Godziny według pracownika</h2>
+                <h2>Dni i szczegóły pracy</h2>
               </div>
-              <input id="dashboardSearch" type="search" placeholder="Szukaj pracownika" />
+              <input id="dashboardSearch" type="search" placeholder="Szukaj dnia lub pracownika" />
             </div>
-            <div class="table-wrap">
-              <table>
-                <thead>
-                  <tr>
-                    <th>Pracownik</th>
-                    <th>Stanowisko</th>
-                    <th>Godziny</th>
-                    <th>Dni</th>
-                    <th class="manager-only">Stawka</th>
-                    <th class="manager-only">Koszt</th>
-                  </tr>
-                </thead>
-                <tbody id="summaryTable"></tbody>
-              </table>
+            <div id="dailySummary" class="daily-summary"></div>
+          </div>
+
+          <div class="panel report-panel finance-visible">
+            <div class="panel-header">
+              <div>
+                <p class="eyebrow">Raport dla księgowości</p>
+                <h2>Eksport do Excela</h2>
+              </div>
+            </div>
+            <div class="report-controls">
+              <label>
+                Zakres
+                <select id="reportRange">
+                  <option value="month">Miesiąc</option>
+                  <option value="week">Tydzień</option>
+                  <option value="day">Dzień</option>
+                </select>
+              </label>
+              <label>
+                Data raportu
+                <input id="reportDate" type="date" />
+              </label>
+              <button id="reportCsvBtn" class="primary-button" type="button">Pobierz raport CSV</button>
             </div>
           </div>
         </section>
@@ -238,7 +230,7 @@
               </div>
               <select id="analysisSort">
                 <option value="hoursDesc">Najwięcej godzin</option>
-                <option value="costDesc" class="manager-only-option">Największy koszt</option>
+                <option value="costDesc" class="finance-visible-option">Największy koszt</option>
                 <option value="overtimeDesc">Najwięcej nadgodzin</option>
                 <option value="nameAsc">Alfabetycznie</option>
               </select>
@@ -262,7 +254,7 @@
                 <button class="ghost-button copy-link" data-link="inputLink">Kopiuj</button>
               </div>
               <div>
-                <span>Szef - dashboard bez stawek</span>
+                <span>Właściciel - dashboard ze stawkami</span>
                 <code id="bossLink"></code>
                 <button class="ghost-button copy-link" data-link="bossLink">Kopiuj</button>
               </div>

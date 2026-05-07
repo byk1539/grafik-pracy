@@ -13,22 +13,23 @@ const initialState = {
 let state = loadState();
 const params = new URLSearchParams(location.search);
 let role = params.get("role") || "manager";
-if (!["input", "boss", "manager"].includes(role)) role = "manager";
+if (role === "boss") role = "owner";
+if (!["input", "owner", "manager"].includes(role)) role = "manager";
 if (params.get("api")) localStorage.setItem(API_URL_KEY, params.get("api"));
 
 const roleNames = {
   input: "Tryb wpisywania godzin",
-  boss: "Tryb szefa",
+  owner: "Tryb wlasciciela",
   manager: "Tryb managera"
 };
 
 const viewTitles = {
   entry: "Wpisy godzin",
-  dashboard: "Dashboard",
+  dashboard: "Kalendarz",
   rates: "Stawki",
   analysis: "Analiza",
-  sharing: "Linki dostępu"
-  , settings: "Ustawienia"
+  sharing: "Linki dostepu",
+  settings: "Ustawienia"
 };
 
 const els = {
@@ -42,16 +43,14 @@ const els = {
   shiftDate: document.querySelector("#shiftDate"),
   shiftStart: document.querySelector("#shiftStart"),
   shiftEnd: document.querySelector("#shiftEnd"),
-  shiftBreak: document.querySelector("#shiftBreak"),
-  shiftType: document.querySelector("#shiftType"),
-  shiftMultiplier: document.querySelector("#shiftMultiplier"),
   shiftNote: document.querySelector("#shiftNote"),
   shiftList: document.querySelector("#shiftList"),
   dashboardSearch: document.querySelector("#dashboardSearch"),
-  summaryTable: document.querySelector("#summaryTable"),
+  dailySummary: document.querySelector("#dailySummary"),
   totalHours: document.querySelector("#totalHours"),
   activeEmployees: document.querySelector("#activeEmployees"),
   totalPayroll: document.querySelector("#totalPayroll"),
+  peakDayCost: document.querySelector("#peakDayCost"),
   avgHours: document.querySelector("#avgHours"),
   employeeForm: document.querySelector("#employeeForm"),
   employeeId: document.querySelector("#employeeId"),
@@ -65,6 +64,9 @@ const els = {
   analysisList: document.querySelector("#analysisList"),
   exportJsonBtn: document.querySelector("#exportJsonBtn"),
   exportCsvBtn: document.querySelector("#exportCsvBtn"),
+  reportCsvBtn: document.querySelector("#reportCsvBtn"),
+  reportRange: document.querySelector("#reportRange"),
+  reportDate: document.querySelector("#reportDate"),
   syncBtn: document.querySelector("#syncBtn"),
   importJsonInput: document.querySelector("#importJsonInput"),
   settingsForm: document.querySelector("#settingsForm"),
@@ -80,6 +82,7 @@ function boot() {
   els.roleLabel.textContent = roleNames[role];
   els.periodMonth.value = currentMonth();
   els.shiftDate.value = today();
+  els.reportDate.value = today();
   els.apiUrl.value = localStorage.getItem(API_URL_KEY) || "";
   applyRole();
   bindEvents();
@@ -104,9 +107,9 @@ function bindEvents() {
       date: els.shiftDate.value,
       start: els.shiftStart.value,
       end: els.shiftEnd.value,
-      breakMinutes: Number(els.shiftBreak.value || 0),
-      type: els.shiftType.value,
-      multiplier: Number(els.shiftMultiplier.value || 1),
+      breakMinutes: 0,
+      type: "regular",
+      multiplier: 1,
       note: els.shiftNote.value.trim()
     };
     state.shifts.push(shift);
@@ -139,6 +142,7 @@ function bindEvents() {
   els.resetEmployeeForm.addEventListener("click", resetEmployeeForm);
   els.exportJsonBtn.addEventListener("click", exportJson);
   els.exportCsvBtn.addEventListener("click", exportCsv);
+  els.reportCsvBtn.addEventListener("click", exportAccountingReport);
   els.syncBtn.addEventListener("click", syncRemote);
   els.importJsonInput.addEventListener("change", importJson);
   els.settingsForm.addEventListener("submit", saveSettings);
@@ -158,8 +162,11 @@ function applyRole() {
   document.querySelectorAll(".manager-only").forEach((el) => {
     el.classList.toggle("is-hidden", role !== "manager");
   });
-  document.querySelectorAll(".manager-only-option").forEach((el) => {
-    el.hidden = role !== "manager";
+  document.querySelectorAll(".finance-visible").forEach((el) => {
+    el.classList.toggle("is-hidden", !canViewFinancials());
+  });
+  document.querySelectorAll(".finance-visible-option").forEach((el) => {
+    el.hidden = !canViewFinancials();
   });
 
   els.navItems.forEach((item) => {
@@ -169,6 +176,10 @@ function applyRole() {
 
   const firstAllowed = els.navItems.find((item) => !item.classList.contains("is-hidden"));
   showView(firstAllowed?.dataset.view || "dashboard");
+}
+
+function canViewFinancials() {
+  return role === "manager" || role === "owner";
 }
 
 function showView(viewId) {
@@ -197,7 +208,7 @@ function renderEmployeeOptions() {
 function renderShiftList() {
   const shifts = getPeriodShifts().sort((a, b) => `${b.date}${b.start}`.localeCompare(`${a.date}${a.start}`));
   if (!shifts.length) {
-    els.shiftList.innerHTML = `<p class="meta">Brak wpisów w tym miesiącu.</p>`;
+    els.shiftList.innerHTML = `<p class="meta">Brak wpisow w tym miesiacu.</p>`;
     return;
   }
 
@@ -209,11 +220,11 @@ function renderShiftList() {
         <article class="row-card">
           <div class="row-card-head">
             <div>
-              <strong>${escapeHtml(employee?.name || "Usunięty pracownik")}</strong>
+              <strong>${escapeHtml(employee?.name || "Usuniety pracownik")}</strong>
               <div class="meta">${formatDate(shift.date)} · ${shift.start}-${shift.end} · ${hours.toFixed(2)} h</div>
             </div>
             <div class="row-actions">
-              <button class="small-button danger" type="button" title="Usuń" onclick="deleteShift('${shift.id}')">x</button>
+              <button class="small-button danger" type="button" title="Usun" onclick="deleteShift('${shift.id}')">x</button>
             </div>
           </div>
           ${shift.note ? `<div class="meta">${escapeHtml(shift.note)}</div>` : ""}
@@ -237,11 +248,11 @@ function renderEmployees() {
         <div class="row-card-head">
           <div>
             <strong>${escapeHtml(employee.name)}</strong>
-            <div class="meta">${escapeHtml(employee.position || "Bez działu")} · ${money(employee.rate)}/h · norma ${employee.norm || 0} h</div>
+            <div class="meta">${escapeHtml(employee.position || "Bez dzialu")} · ${money(employee.rate)}/h · norma ${employee.norm || 0} h</div>
           </div>
           <div class="row-actions">
             <button class="small-button" type="button" title="Edytuj" onclick="editEmployee('${employee.id}')">e</button>
-            <button class="small-button danger" type="button" title="Usuń" onclick="deleteEmployee('${employee.id}')">x</button>
+            <button class="small-button danger" type="button" title="Usun" onclick="deleteEmployee('${employee.id}')">x</button>
           </div>
         </div>
       </article>
@@ -251,28 +262,79 @@ function renderEmployees() {
 
 function renderDashboard() {
   const search = els.dashboardSearch.value.toLowerCase().trim();
-  const summaries = getSummaries().filter((item) => item.employee.name.toLowerCase().includes(search));
+  const summaries = getSummaries();
+  const days = getDailySummaries().filter((day) => {
+    if (!search) return true;
+    return day.date.includes(search) || day.items.some((item) => item.employee.name.toLowerCase().includes(search));
+  });
   const totalHours = summaries.reduce((sum, item) => sum + item.hours, 0);
   const activeCount = summaries.filter((item) => item.hours > 0).length;
   const totalPayroll = summaries.reduce((sum, item) => sum + item.cost, 0);
+  const peakDay = days.reduce((max, day) => (day.cost > (max?.cost || 0) ? day : max), null);
 
   els.totalHours.textContent = totalHours.toFixed(2);
   els.activeEmployees.textContent = String(activeCount);
   els.totalPayroll.textContent = money(totalPayroll);
   els.avgHours.textContent = activeCount ? (totalHours / activeCount).toFixed(2) : "0";
+  els.peakDayCost.textContent = peakDay ? `${money(peakDay.cost)} / ${formatDate(peakDay.date)}` : "0 zl";
 
-  els.summaryTable.innerHTML = summaries
-    .map((item) => `
-      <tr>
-        <td>${escapeHtml(item.employee.name)}</td>
-        <td>${escapeHtml(item.employee.position || "-")}</td>
-        <td>${item.hours.toFixed(2)}</td>
-        <td>${item.days}</td>
-        <td class="manager-only ${role !== "manager" ? "is-hidden" : ""}">${money(item.employee.rate)}/h</td>
-        <td class="manager-only ${role !== "manager" ? "is-hidden" : ""}">${money(item.cost)}</td>
-      </tr>
-    `)
-    .join("");
+  els.dailySummary.innerHTML = days.length
+    ? days.map(renderDayCard).join("")
+    : `<p class="meta">Brak wpisow dla wybranego zakresu.</p>`;
+}
+
+function renderDayCard(day) {
+  return `
+    <article class="row-card">
+      <div class="row-card-head">
+        <div>
+          <strong>${formatDate(day.date)}</strong>
+          <div class="meta">
+            ${day.hours.toFixed(2)} h · ${day.employeesCount} prac. ${canViewFinancials() ? `· ${money(day.cost)}` : ""}
+          </div>
+        </div>
+        <button class="small-button" type="button" title="Pokaz szczegoly" onclick="toggleDayDetails('${day.date}')">+</button>
+      </div>
+      <div id="day-${day.date}" class="detail-table is-hidden">
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Pracownik</th>
+                <th>Stanowisko</th>
+                <th>Start</th>
+                <th>Koniec</th>
+                <th>Godziny</th>
+                <th class="finance-visible ${!canViewFinancials() ? "is-hidden" : ""}">Stawka</th>
+                <th class="finance-visible ${!canViewFinancials() ? "is-hidden" : ""}">Koszt</th>
+                <th>Notatka</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${day.items
+                .map((item) => `
+                  <tr>
+                    <td>${escapeHtml(item.employee.name)}</td>
+                    <td>${escapeHtml(item.employee.position || "-")}</td>
+                    <td>${item.shift.start}</td>
+                    <td>${item.shift.end}</td>
+                    <td>${item.hours.toFixed(2)}</td>
+                    <td class="finance-visible ${!canViewFinancials() ? "is-hidden" : ""}">${money(item.employee.rate)}/h</td>
+                    <td class="finance-visible ${!canViewFinancials() ? "is-hidden" : ""}">${money(item.cost)}</td>
+                    <td>${escapeHtml(item.shift.note || "")}</td>
+                  </tr>
+                `)
+                .join("")}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </article>
+  `;
+}
+
+function toggleDayDetails(date) {
+  document.querySelector(`#day-${date}`)?.classList.toggle("is-hidden");
 }
 
 function renderAnalysis() {
@@ -295,8 +357,8 @@ function renderAnalysis() {
             <div>
               <strong>${escapeHtml(item.employee.name)}</strong>
               <div class="meta">
-                ${item.hours.toFixed(2)} h / ${norm} h normy · nadgodziny ${item.overtime.toFixed(2)} h
-                ${role === "manager" ? ` · koszt ${money(item.cost)}` : ""}
+                ${escapeHtml(item.employee.position || "-")} · ${item.hours.toFixed(2)} h / ${norm} h normy · nadgodziny ${item.overtime.toFixed(2)} h
+                ${canViewFinancials() ? ` · ${money(item.employee.rate)}/h · koszt ${money(item.cost)}` : ""}
               </div>
             </div>
             <strong>${norm ? Math.round((item.hours / norm) * 100) : 0}%</strong>
@@ -313,7 +375,7 @@ function renderLinks() {
   const api = getApiUrl();
   const apiPart = api ? `&api=${encodeURIComponent(api)}` : "";
   document.querySelector("#inputLink").textContent = `${base}?role=input${apiPart}`;
-  document.querySelector("#bossLink").textContent = `${base}?role=boss${apiPart}`;
+  document.querySelector("#bossLink").textContent = `${base}?role=owner${apiPart}`;
   document.querySelector("#managerLink").textContent = `${base}?role=manager${apiPart}`;
 }
 
@@ -332,6 +394,54 @@ function getSummaries() {
       cost: hours * Number(employee.rate || 0)
     };
   });
+}
+
+function getDailySummaries(shifts = getPeriodShifts()) {
+  const grouped = new Map();
+  shifts.forEach((shift) => {
+    const employee = findEmployee(shift.employeeId) || { name: "Usuniety pracownik", rate: 0, position: "" };
+    const hours = calculatePaidHours(shift);
+    const item = {
+      shift,
+      employee,
+      hours,
+      cost: hours * Number(employee.rate || 0)
+    };
+    if (!grouped.has(shift.date)) grouped.set(shift.date, []);
+    grouped.get(shift.date).push(item);
+  });
+
+  return [...grouped.entries()]
+    .map(([date, items]) => ({
+      date,
+      items: items.sort((a, b) => a.employee.name.localeCompare(b.employee.name, "pl")),
+      hours: items.reduce((sum, item) => sum + item.hours, 0),
+      cost: items.reduce((sum, item) => sum + item.cost, 0),
+      employeesCount: new Set(items.map((item) => item.shift.employeeId)).size
+    }))
+    .sort((a, b) => b.date.localeCompare(a.date));
+}
+
+function getReportShifts() {
+  const range = els.reportRange.value;
+  const date = els.reportDate.value || today();
+  if (range === "day") return state.shifts.filter((shift) => shift.date === date);
+  if (range === "week") {
+    const [start, end] = getWeekBounds(date);
+    return state.shifts.filter((shift) => shift.date >= start && shift.date <= end);
+  }
+  const month = date.slice(0, 7);
+  return state.shifts.filter((shift) => shift.date.startsWith(month));
+}
+
+function getWeekBounds(dateValue) {
+  const date = new Date(`${dateValue}T00:00:00`);
+  const day = date.getDay() || 7;
+  const start = new Date(date);
+  start.setDate(date.getDate() - day + 1);
+  const end = new Date(start);
+  end.setDate(start.getDate() + 6);
+  return [toDateInputValue(start), toDateInputValue(end)];
 }
 
 function getPeriodShifts() {
@@ -364,7 +474,7 @@ function editEmployee(id) {
 }
 
 function deleteEmployee(id) {
-  if (!confirm("Usunąć pracownika? Wpisy godzin zostaną w historii, ale nie będą przypisane do aktywnej osoby.")) return;
+  if (!confirm("Usunac pracownika? Wpisy godzin zostana w historii, ale bez aktywnego przypisania.")) return;
   state.employees = state.employees.filter((employee) => employee.id !== id);
   saveState();
   renderAll();
@@ -375,7 +485,7 @@ function deleteShift(id) {
   state.shifts = state.shifts.filter((shift) => shift.id !== id);
   saveState();
   renderAll();
-  showToast("Zmiana usunięta");
+  showToast("Zmiana usunieta");
   autoSaveRemote();
 }
 
@@ -391,7 +501,7 @@ function exportJson() {
 }
 
 function exportCsv() {
-  const rows = [["Pracownik", "Data", "Start", "Koniec", "Przerwa", "Godziny", "Mnoznik", "Typ", "Notatka"]];
+  const rows = [["Pracownik", "Data", "Start", "Koniec", "Godziny", "Notatka"]];
   getPeriodShifts().forEach((shift) => {
     const employee = findEmployee(shift.employeeId);
     rows.push([
@@ -399,15 +509,74 @@ function exportCsv() {
       shift.date,
       shift.start,
       shift.end,
-      shift.breakMinutes,
       calculatePaidHours(shift).toFixed(2),
-      shift.multiplier,
-      shift.type,
       shift.note || ""
     ]);
   });
   const csv = rows.map((row) => row.map(csvCell).join(";")).join("\n");
-  download(`grafik-${els.periodMonth.value}.csv`, csv, "text/csv;charset=utf-8");
+  download(`grafik-${els.periodMonth.value}.csv`, `\uFEFF${csv}`, "text/csv;charset=utf-8");
+}
+
+function exportAccountingReport() {
+  const shifts = getReportShifts();
+  const range = els.reportRange.value;
+  const date = els.reportDate.value || today();
+  const rows = [
+    ["Raport", rangeLabel(range), date],
+    [],
+    ["Podsumowanie pracownikow"],
+    ["Pracownik", "Stanowisko", "Godziny", "Stawka", "Zarobki"]
+  ];
+
+  const employeeRows = state.employees
+    .map((employee) => {
+      const employeeShifts = shifts.filter((shift) => shift.employeeId === employee.id);
+      const hours = employeeShifts.reduce((sum, shift) => sum + calculatePaidHours(shift), 0);
+      return {
+        employee,
+        hours,
+        cost: hours * Number(employee.rate || 0)
+      };
+    })
+    .filter((item) => item.hours > 0)
+    .sort((a, b) => a.employee.name.localeCompare(b.employee.name, "pl"));
+
+  employeeRows.forEach((item) => {
+    rows.push([
+      item.employee.name,
+      item.employee.position || "",
+      item.hours.toFixed(2),
+      Number(item.employee.rate || 0).toFixed(2),
+      item.cost.toFixed(2)
+    ]);
+  });
+
+  rows.push([]);
+  rows.push(["Suma", "", employeeRows.reduce((sum, item) => sum + item.hours, 0).toFixed(2), "", employeeRows.reduce((sum, item) => sum + item.cost, 0).toFixed(2)]);
+  rows.push([]);
+  rows.push(["Szczegoly dzienne"]);
+  rows.push(["Data", "Pracownik", "Stanowisko", "Start", "Koniec", "Godziny", "Stawka", "Zarobki", "Notatka"]);
+
+  getDailySummaries(shifts)
+    .sort((a, b) => a.date.localeCompare(b.date))
+    .forEach((day) => {
+      day.items.forEach((item) => {
+        rows.push([
+          item.shift.date,
+          item.employee.name,
+          item.employee.position || "",
+          item.shift.start,
+          item.shift.end,
+          item.hours.toFixed(2),
+          Number(item.employee.rate || 0).toFixed(2),
+          item.cost.toFixed(2),
+          item.shift.note || ""
+        ]);
+      });
+    });
+
+  const csv = rows.map((row) => row.map(csvCell).join(";")).join("\n");
+  download(`raport-ksiegowosc-${range}-${date}.csv`, `\uFEFF${csv}`, "text/csv;charset=utf-8");
 }
 
 function importJson(event) {
@@ -424,7 +593,7 @@ function importJson(event) {
       showToast("Dane zaimportowane");
       autoSaveRemote();
     } catch {
-      showToast("Nie udało się zaimportować pliku");
+      showToast("Nie udalo sie zaimportowac pliku");
     } finally {
       event.target.value = "";
     }
@@ -539,7 +708,7 @@ function seedDemoShifts() {
       date: `${year}-${month}-1${index + 1}`,
       start: "10:00",
       end: "18:00",
-      breakMinutes: 30,
+      breakMinutes: 0,
       type: "regular",
       multiplier: 1,
       note: ""
@@ -574,12 +743,29 @@ function today() {
   return new Date().toISOString().slice(0, 10);
 }
 
+function toDateInputValue(date) {
+  return date.toISOString().slice(0, 10);
+}
+
+function rangeLabel(range) {
+  if (range === "day") return "Dzien";
+  if (range === "week") return "Tydzien";
+  return "Miesiac";
+}
+
 function formatDate(value) {
-  return new Intl.DateTimeFormat("pl-PL", { day: "2-digit", month: "2-digit", year: "numeric" }).format(new Date(value));
+  return new Intl.DateTimeFormat("pl-PL", {
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric"
+  }).format(new Date(value));
 }
 
 function money(value) {
-  return new Intl.NumberFormat("pl-PL", { style: "currency", currency: "PLN" }).format(Number(value || 0));
+  return new Intl.NumberFormat("pl-PL", {
+    style: "currency",
+    currency: "PLN"
+  }).format(Number(value || 0));
 }
 
 function csvCell(value) {
@@ -615,3 +801,4 @@ function escapeHtml(value) {
 window.editEmployee = editEmployee;
 window.deleteEmployee = deleteEmployee;
 window.deleteShift = deleteShift;
+window.toggleDayDetails = toggleDayDetails;

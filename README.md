@@ -9,17 +9,19 @@ Otwórz plik `index.html` w przeglądarce.
 Role są wybierane przez parametr w linku:
 
 - `index.html?role=input` - osoba wpisująca godziny
-- `index.html?role=boss` - dashboard dla szefa bez stawek i kosztów
+- `index.html?role=owner` - dashboard dla wlasciciela ze stawkami i kosztami
+- `index.html?role=boss` - stary link, nadal dziala i kieruje do trybu wlasciciela
 - `index.html?role=manager` - pełny panel managera ze stawkami
 
 ## Co już działa
 
-- dodawanie zmian z datą, godziną startu, końca, przerwą i mnożnikiem
+- uproszczone wpisywanie zmian: pracownik, data, start, koniec i notatka
 - liczenie zmian przechodzących przez północ
-- miesięczne podsumowanie godzin dla każdego pracownika
+- miesięczne podsumowanie dni pracy z możliwością rozwinięcia szczegółów pracowników
 - panel stawek i norm miesięcznych
 - koszt wynagrodzeń widoczny tylko w trybie managera
 - analiza norm, nadgodzin i kosztów
+- raport CSV do Excela dla dnia, tygodnia albo miesiąca
 - eksport JSON, import JSON i eksport CSV
 - dane zapisywane lokalnie w przeglądarce
 
