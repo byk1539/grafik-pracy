@@ -7,7 +7,8 @@ const initialState = {
     { id: crypto.randomUUID(), name: "Marek Nowak", position: "Magazyn", rate: 35, norm: 168 },
     { id: crypto.randomUUID(), name: "Julia Zielinska", position: "Produkcja", rate: 30, norm: 168 }
   ],
-  shifts: []
+  shifts: [],
+  schedules: []
 };
 
 let state = loadState();
@@ -25,6 +26,7 @@ const roleNames = {
 
 const viewTitles = {
   entry: "Wpisy godzin",
+  schedule: "Grafik",
   dashboard: "Kalendarz",
   rates: "Stawki",
   analysis: "Analiza",
@@ -45,6 +47,19 @@ const els = {
   shiftEnd: document.querySelector("#shiftEnd"),
   shiftNote: document.querySelector("#shiftNote"),
   shiftList: document.querySelector("#shiftList"),
+  scheduleForm: document.querySelector("#scheduleForm"),
+  scheduleEmployee: document.querySelector("#scheduleEmployee"),
+  scheduleDate: document.querySelector("#scheduleDate"),
+  scheduleStart: document.querySelector("#scheduleStart"),
+  scheduleEnd: document.querySelector("#scheduleEnd"),
+  scheduleNote: document.querySelector("#scheduleNote"),
+  scheduleFrom: document.querySelector("#scheduleFrom"),
+  scheduleTo: document.querySelector("#scheduleTo"),
+  scheduleCalendar: document.querySelector("#scheduleCalendar"),
+  printScheduleBtn: document.querySelector("#printScheduleBtn"),
+  dashboardFrom: document.querySelector("#dashboardFrom"),
+  dashboardTo: document.querySelector("#dashboardTo"),
+  dashboardQuickRange: document.querySelector("#dashboardQuickRange"),
   dashboardSearch: document.querySelector("#dashboardSearch"),
   dailySummary: document.querySelector("#dailySummary"),
   totalHours: document.querySelector("#totalHours"),
@@ -52,6 +67,7 @@ const els = {
   totalPayroll: document.querySelector("#totalPayroll"),
   peakDayCost: document.querySelector("#peakDayCost"),
   avgHours: document.querySelector("#avgHours"),
+  financeChart: document.querySelector("#financeChart"),
   employeeForm: document.querySelector("#employeeForm"),
   employeeId: document.querySelector("#employeeId"),
   employeeName: document.querySelector("#employeeName"),
@@ -82,6 +98,12 @@ function boot() {
   els.roleLabel.textContent = roleNames[role];
   els.periodMonth.value = currentMonth();
   els.shiftDate.value = today();
+  els.scheduleDate.value = today();
+  const [rangeStart, rangeEnd] = getMonthBounds(today());
+  els.scheduleFrom.value = rangeStart;
+  els.scheduleTo.value = rangeEnd;
+  els.dashboardFrom.value = rangeStart;
+  els.dashboardTo.value = rangeEnd;
   els.reportDate.value = today();
   els.apiUrl.value = localStorage.getItem(API_URL_KEY) || "";
   applyRole();
@@ -96,6 +118,11 @@ function bindEvents() {
   });
 
   els.periodMonth.addEventListener("change", renderAll);
+  els.scheduleFrom.addEventListener("change", renderSchedule);
+  els.scheduleTo.addEventListener("change", renderSchedule);
+  els.dashboardFrom.addEventListener("change", renderDashboard);
+  els.dashboardTo.addEventListener("change", renderDashboard);
+  els.dashboardQuickRange.addEventListener("change", applyDashboardQuickRange);
   els.dashboardSearch.addEventListener("input", renderDashboard);
   els.analysisSort.addEventListener("change", renderAnalysis);
 
@@ -117,6 +144,24 @@ function bindEvents() {
     els.shiftNote.value = "";
     renderAll();
     showToast("Zmiana zapisana");
+    autoSaveRemote();
+  });
+
+  els.scheduleForm.addEventListener("submit", (event) => {
+    event.preventDefault();
+    const plannedShift = {
+      id: crypto.randomUUID(),
+      employeeId: els.scheduleEmployee.value,
+      date: els.scheduleDate.value,
+      start: els.scheduleStart.value,
+      end: els.scheduleEnd.value,
+      note: els.scheduleNote.value.trim()
+    };
+    state.schedules.push(plannedShift);
+    saveState();
+    els.scheduleNote.value = "";
+    renderAll();
+    showToast("Dodano do grafiku");
     autoSaveRemote();
   });
 
@@ -143,6 +188,7 @@ function bindEvents() {
   els.exportJsonBtn.addEventListener("click", exportJson);
   els.exportCsvBtn.addEventListener("click", exportCsv);
   els.reportCsvBtn.addEventListener("click", exportAccountingReport);
+  els.printScheduleBtn.addEventListener("click", printSchedule);
   els.syncBtn.addEventListener("click", syncRemote);
   els.importJsonInput.addEventListener("change", importJson);
   els.settingsForm.addEventListener("submit", saveSettings);
@@ -190,11 +236,21 @@ function showView(viewId) {
 
 function renderAll() {
   renderEmployeeOptions();
+  renderScheduleEmployeeOptions();
   renderShiftList();
+  renderSchedule();
   renderEmployees();
   renderDashboard();
   renderAnalysis();
   renderLinks();
+}
+
+function renderScheduleEmployeeOptions() {
+  els.scheduleEmployee.innerHTML = state.employees
+    .slice()
+    .sort((a, b) => a.name.localeCompare(b.name, "pl"))
+    .map((employee) => `<option value="${employee.id}">${escapeHtml(employee.name)}</option>`)
+    .join("");
 }
 
 function renderEmployeeOptions() {
@@ -260,10 +316,48 @@ function renderEmployees() {
     .join("");
 }
 
+function renderSchedule() {
+  const planned = getScheduleRangeItems();
+  const days = groupScheduleByDay(planned);
+  els.scheduleCalendar.innerHTML = days.length
+    ? days.map(renderScheduleDay).join("")
+    : `<p class="meta">Brak zaplanowanych zmian w tym zakresie.</p>`;
+}
+
+function renderScheduleDay(day) {
+  const totalHours = day.items.reduce((sum, item) => sum + item.hours, 0);
+  return `
+    <article class="schedule-day">
+      <div class="row-card-head">
+        <div>
+          <strong>${formatDate(day.date)}</strong>
+          <div class="meta">${day.items.length} osob · ${totalHours.toFixed(2)} h planu</div>
+        </div>
+      </div>
+      <div class="schedule-workers">
+        ${day.items
+          .map((item) => `
+            <div class="schedule-worker">
+              <div>
+                <strong>${escapeHtml(item.employee.name)}</strong>
+                <span>${escapeHtml(item.employee.position || "-")}</span>
+              </div>
+              <div class="schedule-time">${item.shift.start}-${item.shift.end}</div>
+              ${role === "manager" ? `<button class="small-button danger" type="button" title="Usun" onclick="deleteSchedule('${item.shift.id}')">x</button>` : ""}
+              ${item.shift.note ? `<div class="meta schedule-note">${escapeHtml(item.shift.note)}</div>` : ""}
+            </div>
+          `)
+          .join("")}
+      </div>
+    </article>
+  `;
+}
+
 function renderDashboard() {
   const search = els.dashboardSearch.value.toLowerCase().trim();
-  const summaries = getSummaries();
-  const days = getDailySummaries().filter((day) => {
+  const rangeShifts = getDashboardShifts();
+  const summaries = getSummaries(rangeShifts);
+  const days = getDailySummaries(rangeShifts).filter((day) => {
     if (!search) return true;
     return day.date.includes(search) || day.items.some((item) => item.employee.name.toLowerCase().includes(search));
   });
@@ -281,6 +375,7 @@ function renderDashboard() {
   els.dailySummary.innerHTML = days.length
     ? days.map(renderDayCard).join("")
     : `<p class="meta">Brak wpisow dla wybranego zakresu.</p>`;
+  renderFinanceChart(days);
 }
 
 function renderDayCard(day) {
@@ -337,6 +432,32 @@ function toggleDayDetails(date) {
   document.querySelector(`#day-${date}`)?.classList.toggle("is-hidden");
 }
 
+function renderFinanceChart(days) {
+  if (!els.financeChart) return;
+  if (!days.length) {
+    els.financeChart.innerHTML = `<p class="meta">Brak danych do wykresu.</p>`;
+    return;
+  }
+  const ascendingDays = days.slice().sort((a, b) => a.date.localeCompare(b.date));
+  const maxHours = Math.max(...ascendingDays.map((day) => day.hours), 1);
+  const maxCost = Math.max(...ascendingDays.map((day) => day.cost), 1);
+  els.financeChart.innerHTML = ascendingDays
+    .map((day) => {
+      const hoursHeight = Math.max(8, (day.hours / maxHours) * 100);
+      const costHeight = Math.max(8, (day.cost / maxCost) * 100);
+      return `
+        <div class="chart-day" title="${formatDate(day.date)} · ${day.hours.toFixed(2)} h · ${money(day.cost)}">
+          <div class="chart-bars">
+            <span class="chart-bar hours" style="height:${hoursHeight}%"></span>
+            <span class="chart-bar cost" style="height:${costHeight}%"></span>
+          </div>
+          <small>${day.date.slice(8, 10)}</small>
+        </div>
+      `;
+    })
+    .join("");
+}
+
 function renderAnalysis() {
   const summaries = getSummaries();
   const sort = els.analysisSort.value;
@@ -379,8 +500,7 @@ function renderLinks() {
   document.querySelector("#managerLink").textContent = `${base}?role=manager${apiPart}`;
 }
 
-function getSummaries() {
-  const shifts = getPeriodShifts();
+function getSummaries(shifts = getPeriodShifts()) {
   return state.employees.map((employee) => {
     const employeeShifts = shifts.filter((shift) => shift.employeeId === employee.id);
     const hours = employeeShifts.reduce((sum, shift) => sum + calculatePaidHours(shift), 0);
@@ -434,6 +554,62 @@ function getReportShifts() {
   return state.shifts.filter((shift) => shift.date.startsWith(month));
 }
 
+function getDashboardShifts() {
+  const start = els.dashboardFrom.value || `${currentMonth()}-01`;
+  const end = els.dashboardTo.value || today();
+  return state.shifts.filter((shift) => shift.date >= start && shift.date <= end);
+}
+
+function getScheduleRangeItems() {
+  const start = els.scheduleFrom.value || `${currentMonth()}-01`;
+  const end = els.scheduleTo.value || today();
+  return state.schedules.filter((shift) => shift.date >= start && shift.date <= end);
+}
+
+function groupScheduleByDay(plannedShifts) {
+  const grouped = new Map();
+  plannedShifts.forEach((shift) => {
+    const employee = findEmployee(shift.employeeId) || { name: "Usuniety pracownik", position: "" };
+    const item = {
+      shift,
+      employee,
+      hours: calculateHours({ ...shift, breakMinutes: 0, multiplier: 1 })
+    };
+    if (!grouped.has(shift.date)) grouped.set(shift.date, []);
+    grouped.get(shift.date).push(item);
+  });
+  return [...grouped.entries()]
+    .map(([date, items]) => ({
+      date,
+      items: items.sort((a, b) => `${a.shift.start}${a.employee.name}`.localeCompare(`${b.shift.start}${b.employee.name}`, "pl"))
+    }))
+    .sort((a, b) => a.date.localeCompare(b.date));
+}
+
+function applyDashboardQuickRange() {
+  const todayValue = today();
+  if (els.dashboardQuickRange.value === "today") {
+    els.dashboardFrom.value = todayValue;
+    els.dashboardTo.value = todayValue;
+  } else if (els.dashboardQuickRange.value === "week") {
+    const [start, end] = getWeekBounds(todayValue);
+    els.dashboardFrom.value = start;
+    els.dashboardTo.value = end;
+  } else if (els.dashboardQuickRange.value === "quarter") {
+    const end = new Date(`${todayValue}T00:00:00`);
+    const start = new Date(end);
+    start.setMonth(start.getMonth() - 2);
+    start.setDate(1);
+    els.dashboardFrom.value = toDateInputValue(start);
+    els.dashboardTo.value = toDateInputValue(end);
+  } else {
+    const [start, end] = getMonthBounds(todayValue);
+    els.dashboardFrom.value = start;
+    els.dashboardTo.value = end;
+  }
+  renderDashboard();
+}
+
 function getWeekBounds(dateValue) {
   const date = new Date(`${dateValue}T00:00:00`);
   const day = date.getDay() || 7;
@@ -441,6 +617,13 @@ function getWeekBounds(dateValue) {
   start.setDate(date.getDate() - day + 1);
   const end = new Date(start);
   end.setDate(start.getDate() + 6);
+  return [toDateInputValue(start), toDateInputValue(end)];
+}
+
+function getMonthBounds(dateValue) {
+  const date = new Date(`${dateValue}T00:00:00`);
+  const start = new Date(date.getFullYear(), date.getMonth(), 1);
+  const end = new Date(date.getFullYear(), date.getMonth() + 1, 0);
   return [toDateInputValue(start), toDateInputValue(end)];
 }
 
@@ -487,6 +670,18 @@ function deleteShift(id) {
   renderAll();
   showToast("Zmiana usunieta");
   autoSaveRemote();
+}
+
+function deleteSchedule(id) {
+  state.schedules = state.schedules.filter((shift) => shift.id !== id);
+  saveState();
+  renderAll();
+  showToast("Usunieto z grafiku");
+  autoSaveRemote();
+}
+
+function printSchedule() {
+  window.print();
 }
 
 function resetEmployeeForm() {
@@ -587,7 +782,7 @@ function importJson(event) {
     try {
       const data = JSON.parse(reader.result);
       if (!Array.isArray(data.employees) || !Array.isArray(data.shifts)) throw new Error("Nieprawidlowy format");
-      state = data;
+      state = normalizeState(data);
       saveState();
       renderAll();
       showToast("Dane zaimportowane");
@@ -628,7 +823,7 @@ async function loadRemote() {
   try {
     const data = await jsonp(apiUrl);
     if (!Array.isArray(data.employees) || !Array.isArray(data.shifts)) throw new Error("Nieprawidlowe dane");
-    state = data;
+    state = normalizeState(data);
     saveState();
     renderAll();
     showToast("Pobrano dane z arkusza");
@@ -719,12 +914,20 @@ function seedDemoShifts() {
 
 function loadState() {
   const raw = localStorage.getItem(STORAGE_KEY);
-  if (!raw) return structuredClone(initialState);
+  if (!raw) return normalizeState(structuredClone(initialState));
   try {
-    return JSON.parse(raw);
+    return normalizeState(JSON.parse(raw));
   } catch {
-    return structuredClone(initialState);
+    return normalizeState(structuredClone(initialState));
   }
+}
+
+function normalizeState(data) {
+  return {
+    employees: Array.isArray(data.employees) ? data.employees : [],
+    shifts: Array.isArray(data.shifts) ? data.shifts : [],
+    schedules: Array.isArray(data.schedules) ? data.schedules : []
+  };
 }
 
 function saveState() {
@@ -801,4 +1004,5 @@ function escapeHtml(value) {
 window.editEmployee = editEmployee;
 window.deleteEmployee = deleteEmployee;
 window.deleteShift = deleteShift;
+window.deleteSchedule = deleteSchedule;
 window.toggleDayDetails = toggleDayDetails;

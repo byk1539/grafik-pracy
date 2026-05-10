@@ -16,11 +16,16 @@ Role są wybierane przez parametr w linku:
 ## Co już działa
 
 - uproszczone wpisywanie zmian: pracownik, data, start, koniec i notatka
+- tworzenie planowanego grafiku pracy dla managera
+- podglad grafiku dla wlasciciela i pracownikow
+- druk grafiku do PDF przez przycisk `PDF`
 - liczenie zmian przechodzących przez północ
 - miesięczne podsumowanie dni pracy z możliwością rozwinięcia szczegółów pracowników
+- dashboard z zakresem dat: dzien, tydzien, miesiac albo 3 miesiace
 - panel stawek i norm miesięcznych
-- koszt wynagrodzeń widoczny tylko w trybie managera
+- koszt wynagrodzen widoczny w trybie managera i wlasciciela
 - analiza norm, nadgodzin i kosztów
+- mini wykres godzin i kosztow dzien po dniu
 - raport CSV do Excela dla dnia, tygodnia albo miesiąca
 - eksport JSON, import JSON i eksport CSV
 - dane zapisywane lokalnie w przeglądarce

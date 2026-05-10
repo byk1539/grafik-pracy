@@ -22,6 +22,10 @@
             <span class="icon">+</span>
             Wpisy godzin
           </button>
+          <button class="nav-item" data-view="schedule" data-roles="manager,owner,input">
+            <span class="icon">K</span>
+            Grafik
+          </button>
           <button class="nav-item" data-view="dashboard" data-roles="owner,manager,input">
             <span class="icon">#</span>
             Dashboard
@@ -117,7 +121,96 @@
           </div>
         </section>
 
+        <section id="schedule" class="view">
+          <div class="split-layout">
+            <form id="scheduleForm" class="panel form-panel manager-only">
+              <div class="panel-header">
+                <div>
+                  <p class="eyebrow">Plan pracy</p>
+                  <h2>Dodaj do grafiku</h2>
+                </div>
+              </div>
+
+              <label>
+                Pracownik
+                <select id="scheduleEmployee" required></select>
+              </label>
+
+              <div class="form-grid">
+                <label>
+                  Data
+                  <input id="scheduleDate" type="date" required />
+                </label>
+                <label>
+                  Start
+                  <input id="scheduleStart" type="time" value="08:00" required />
+                </label>
+                <label>
+                  Koniec
+                  <input id="scheduleEnd" type="time" value="16:00" required />
+                </label>
+              </div>
+
+              <label>
+                Notatka
+                <textarea id="scheduleNote" rows="3" placeholder="np. kasa, magazyn, zamkniecie lokalu"></textarea>
+              </label>
+
+              <button class="primary-button" type="submit">Dodaj do grafiku</button>
+            </form>
+
+            <div class="panel" id="schedulePrintArea">
+              <div class="panel-header">
+                <div>
+                  <p class="eyebrow">Grafik pracownikow</p>
+                  <h2>Kto pracuje danego dnia</h2>
+                </div>
+                <div class="schedule-actions">
+                  <label>
+                    Od
+                    <input id="scheduleFrom" type="date" />
+                  </label>
+                  <label>
+                    Do
+                    <input id="scheduleTo" type="date" />
+                  </label>
+                  <button id="printScheduleBtn" class="ghost-button" type="button">PDF</button>
+                </div>
+              </div>
+              <div id="scheduleCalendar" class="schedule-calendar"></div>
+            </div>
+          </div>
+        </section>
+
         <section id="dashboard" class="view">
+          <div class="panel dashboard-range">
+            <div class="panel-header">
+              <div>
+                <p class="eyebrow">Zakres danych</p>
+                <h2>Podsumowanie pracy</h2>
+              </div>
+            </div>
+            <div class="report-controls">
+              <label>
+                Od
+                <input id="dashboardFrom" type="date" />
+              </label>
+              <label>
+                Do
+                <input id="dashboardTo" type="date" />
+              </label>
+              <label>
+                Szybki zakres
+                <select id="dashboardQuickRange">
+                  <option value="month">Miesiac</option>
+                  <option value="week">Tydzien</option>
+                  <option value="today">Dzisiaj</option>
+                  <option value="quarter">3 miesiace</option>
+                </select>
+              </label>
+            </div>
+          </div>
+
           <div class="metric-grid">
             <article class="metric">
               <span>Łącznie godzin</span>
@@ -150,6 +243,16 @@
               <input id="dashboardSearch" type="search" placeholder="Szukaj dnia lub pracownika" />
             </div>
             <div id="dailySummary" class="daily-summary"></div>
+          </div>
+
+          <div class="panel report-panel finance-visible">
+            <div class="panel-header">
+              <div>
+                <p class="eyebrow">Finanse</p>
+                <h2>Koszty i godziny dzien po dniu</h2>
+              </div>
+            </div>
+            <div id="financeChart" class="mini-chart"></div>
           </div>
 
           <div class="panel report-panel finance-visible">
